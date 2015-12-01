@@ -8,6 +8,10 @@ import logging
 import logging.handlers
 import os
 import time
+try:
+    import ujson as json
+except ImportError:
+    import json
 
 
 __inited_loggers = {}
@@ -15,34 +19,22 @@ __all__ = ['get_logger']
 
 
 class SmartLogger(logging.Logger):
-    """添加了两个功能:
-
-    1. 以 key-value 方式添加数据
-    2. 支持将 key-value 内容输出成字符串
+    """添加了功能:
+    支持将 key-value 内容输出成字符串
     """
-
     def __init__(self, name, level=logging.NOTSET):
         super(SmartLogger, self).__init__(name, level)
-        self.__kv = {}
 
-    def append(self, key, value):
-        """添加一个 key-value 的 pair
-
-        参数:
-            key: 关键词参数
-            value: 关键词对应的值
-        """
-        self.__kv[key] = value
-
-    def flush(self, level, *args, **kwargs):
+    def flush(self, level, pairs, *args, **kwargs):
         """以制定等级输出 key-value 中的数据
 
         参数:
             level: 日志等级, 字符串. 必须是 logging 支持的类型
                    注意: 这里可能带来安全问题
+            pairs: 需要输出的数据对
         """
-        msg = '\t'.join(['='.join(x) for x in self.__kv.items()])
-        self.__kv = {}
+        # 黑名单包括:
+        msg = json.dumps(pairs)
         if level == 'debug':
             if self.isEnabledFor(logging.DEBUG):
                 self._log(logging.DEBUG, msg, args, **kwargs)
@@ -130,13 +122,19 @@ def __init_logger(logger_name, log_filename, logger_level, file_level=None):
         interval=1,
         backupCount=0,
     )
+    logger = None
+    if logger_name == 'root':
+        file_level = logging.WARNING
+        logger = logging.getLogger()  # root logger of logging
+    else:
+        if file_level is None:
+            file_level = logger_level
+        logger = SmartLogger(logger_name, logger_level)
+
     # handler 等级
-    if file_level is None:
-        file_level = logger_level
     handler.setLevel(file_level)
     # handler 格式
     handler.setFormatter(formatter)
-    logger = SmartLogger(logger_name, logger_level)
     logger.addHandler(handler)
     logger.setLevel(logger_level)
 
@@ -160,7 +158,7 @@ def get_logger(name):
         # 日志文件名为 {name}_log,  切分后为 {name}_log.YYYY-MM-DD
         log_dir = os.path.join(
             os.path.abspath(os.path.dirname(__file__)),
-            '../../log',
+            '../../../log',
         )
         # 判断文件夹是否存在
         if not os.path.exists(log_dir):
@@ -173,3 +171,6 @@ def get_logger(name):
         __init_logger(name, log_path, logging.INFO)
 
     return __inited_loggers[name]
+
+# 默认初始化 root logger
+get_logger('root')

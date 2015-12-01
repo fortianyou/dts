@@ -30,7 +30,7 @@ def get_config(config_file=None):
         if config_file is None:
             config_file = os.path.join(
                 os.path.abspath(os.path.dirname(__file__)),
-                '../../conf/server.cfg',
+                '../../../conf/server.cfg',
             )
         config.read(config_file)
 
