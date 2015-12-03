@@ -2,6 +2,7 @@
 # -*- encoding: utf-8 -*-
 import random
 import tornado.log
+from bson.objectid import ObjectId
 import base_handler
 import api.libs.database
 import api.libs.log
@@ -29,27 +30,43 @@ class AlbumsHandler(base_handler.BaseHandler):
         self._logs['os'] = self.get_argument('os', None)
         self._logs['ver'] = self.get_argument('ver', None)
         self._logs['max'] = self.get_argument('max', '10')
+        self._logs['beg_id'] = self.get_argument('beg_id', '0')
 
     def __get_albums(self):
         """从服务器中获取写真集列表
         """
-        left = int(self.get_argument('max', 10))
-        # 记录请求数据库次数
-        self._logs['db_req'] = 0
+        albums_info = {}
+        # 最大张数
+        try:
+            max_albums = int(self.get_argument('max', 10))
+        except:
+            max_albums = 10
+
+        # 起始位置
+        try:
+            albums_info = {
+                '_id': {
+                    '$lt': ObjectId(self.get_argument('beg_id')),
+                }
+            }
+        except:
+            pass
+
         self._rets['albums'] = []
-        while left > 0:
-            # 请求一次数据库
-            self._logs['db_req'] += 1
-            rand = random.random()
-            albums = self.__db.get_albums({'rand': {'$gt': rand}}).limit(left)
-            for album in albums:
-                del album['_id']
-                del album['rand']
-                # 为图片添加域名, 这样比较灵活
-                cover_url = self.__cdn_domain + "/" + album['cover_url']
-                album['cover_url'] = cover_url
-                self._rets['albums'].append(album)
-                left -= 1
+        albums = self.__db.get_albums(albums_info).limit(max_albums)
+        last_id = None
+        for album in albums:
+            last_id = album['_id']
+            del album['_id']
+            del album['date']
+            # 为图片添加域名, 这样比较灵活
+            cover_url = '{0}/{1}!thumb'.format(
+                self.__cdn_domain,
+                album['cover_url']
+            )
+            album['cover_url'] = cover_url
+            self._rets['albums'].append(album)
+        self._rets['last_id'] = str(last_id)
 
     def get(self):
         logger_level = 'info'

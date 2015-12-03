@@ -5,6 +5,7 @@
 """
 import random
 import pymongo
+import datetime
 import utils
 import config
 
@@ -34,18 +35,23 @@ class Database(object):
             [('name', pymongo.ASCENDING), ('press', pymongo.ASCENDING)],
             unique=True,
         )
-        # 用于随机选取数据使用, 不用唯一
+        # 日期, 选取数据使用, 不用唯一
         albums.create_index(
-            [('rand', pymongo.ASCENDING)],
+            [('date', pymongo.ASCENDING)],
             unique=False,
         )
 
         # 初始化 `照片` collection
         photos = db.photos
         # 建立索引, 为写真集名字建立索引, 不唯一.
-        albums.create_index(
+        photos.create_index(
             [('album_name', pymongo.ASCENDING), ('press', pymongo.ASCENDING)],
             unique=False,
+        )
+        # 用 _id 唯一标识一张图片, 可用于点赞等
+        photos.create_index(
+            [('_id', pymongo.DESCENDING)],
+            unique=True,
         )
         return albums, photos
 
@@ -76,8 +82,8 @@ class Database(object):
             pymongo.errors.DuplicateKeyError: 已存在
         """
         for album in albums_info:
-            if 'rand' not in album:
-                album['rand'] = random.random()
+            if 'date' not in album:
+                album['date'] = datetime.datetime.utcnow()
         return self.__albums.insert(albums_info)
 
     def shuffle_albums(self):
@@ -92,12 +98,12 @@ class Database(object):
         """可以通过任意维度来查询, 但是只对 `name` 和 `press` 建了索引
 
         参数:
-            album_info: 请看 `insert_album` 的注释.
+            albums_info: 请看 `insert_album` 的注释.
 
         返回:
             返回迭代器, 出错抛出异常
         """
-        return self.__albums.find(albums_info)
+        return self.__albums.find(albums_info).sort('_id', pymongo.DESCENDING)
 
     def insert_photos(self, photos_info):
         """插入图片信息

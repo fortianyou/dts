@@ -43,7 +43,10 @@ class PhotosHandler(base_handler.BaseHandler):
         }).skip(skip).limit(max_photos)
 
         for photo in photos:
-            self._rets['photos'].append(self.__cdn_domain + "/" + photo['url'])
+            self._rets['photos'].append({
+                "url": "{0}/{1}!thumb".format(self.__cdn_domain, photo['url']),
+                "id": str(photo['_id']),
+            })
 
     def __get_album_info(self):
         album_gen = self.__db.get_albums({
